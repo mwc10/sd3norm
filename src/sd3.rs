@@ -3,13 +3,13 @@ use traits::SI;
 
 #[derive(Debug, Fail)]
 pub enum SD3Error {
-    #[fail(display = "Row had a non-empty Exclude column")]
+    #[fail(display = "row had a non-empty Exclude column")]
     Excluded,
-    #[fail(display = "Row did not have associated normalization info columns")]
+    #[fail(display = "row did not have associated normalization info columns")]
     NoInfo,
-    #[fail(display = "Row did not an entered Value")]
+    #[fail(display = "row did not have an entered Value")]
     NoValue,
-    #[fail(display = "Row did not an entered Value Unit")]
+    #[fail(display = "row did not have an entered Value Unit")]
     NoValueUnit,
 }
 //TODO: Deserialize optional string fields with a null || "" = None checking function

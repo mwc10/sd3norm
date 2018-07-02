@@ -17,6 +17,7 @@ pub enum VolUnit {
 pub enum ConcUnit {
     ng_ml,
     g_l,
+    //Had to shoe-horn ng/day/10^6 cells into here; not a normal concentration, though.
     ng_day_millioncells,
 }
 
@@ -29,7 +30,7 @@ impl SI for VolUnit {
 
     fn si_factor(&self) -> f64 {
         use self::VolUnit::*;
-        // SI base unit are liters)
+        // SI base unit are liters
         match self {
             ml => 1.0/1_000.0,
             ul => 1.0/1_000_000.0,
