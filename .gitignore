@@ -1,0 +1,6 @@
+# Input/Output files
+*.xlsx
+*.csv
+
+/target
+**/*.rs.bk
