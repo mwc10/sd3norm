@@ -53,18 +53,26 @@ fn run(opts: Opt) -> Result<(), Error> {
     let sheets = workbook.sheet_names().to_vec();
 
     for (i, s) in sheets.iter().enumerate() {
-        println!("Sheet {}: {}", i, s);
+        println!("Sheet #{}: {}", i, s);
         let sheet = workbook.worksheet_range(s).unwrap()?;
-        let mut iter = RangeDeserializerBuilder::new()
+
+        let mut rows = RangeDeserializerBuilder::new()
             .has_headers(true)
             .from_range(&sheet)?;
 
-        for (i, result) in iter.take(2).enumerate() {
+        for (i, result) in rows.take(5).enumerate() {
             let record: SD3 = result
-                .context(format!("deserializing row {}", i+1))?;
-            println!("{:?}", &record);
+                .context(format!("deserializing row {}", i+2))?;
+            //println!("{:?}", &record);
 
-            let normalized = record.into_normalized();
+            let normalized = match record.into_normalized() {
+                Ok(n) => n,
+                Err(e) => {
+                    println!("Row {} couldn't be normalized due to:\n{}", i+2, e);
+                    continue;
+                },
+            };
+
             println!("normalized:\n{:#?}", &normalized);
         }
 

@@ -1,7 +1,18 @@
 use units::{ConcUnit, VolUnit, to_si};
-use failure::Error;
 use traits::SI;
 
+#[derive(Debug, Fail)]
+pub enum SD3Error {
+    #[fail(display = "Row had a non-empty Exclude column")]
+    Excluded,
+    #[fail(display = "Row did not have associated normalization info columns")]
+    NoInfo,
+    #[fail(display = "Row did not an entered Value")]
+    NoValue,
+    #[fail(display = "Row did not an entered Value Unit")]
+    NoValueUnit,
+}
+//TODO: Deserialize optional string fields with a null || "" = None checking function
 #[derive(Debug, Deserialize)]
 pub struct SD3 {
     #[serde(rename = "Chip ID")]
@@ -25,9 +36,9 @@ pub struct SD3 {
     #[serde(rename = "Minute")]
     min: f64,
     #[serde(rename = "Value")]
-    value: f64,
+    value: Option<f64>,
     #[serde(rename = "Value Unit")]
-    value_unit: ConcUnit, 
+    value_unit: Option<ConcUnit>, 
     #[serde(rename = "Caution Flag")]
     flag: Option<String>,
     #[serde(rename = "Exclude")]
@@ -43,30 +54,32 @@ pub struct SD3 {
 }
 
 impl SD3 {
-    pub fn into_normalized(mut self) -> Result<Self, Error> {
+    pub fn into_normalized(mut self) -> Result<Self, SD3Error> {
         if let Some(ref f) = self.exclude {
-            if f != "" { bail!("Excluded row") }
+            if f != "" { return Err(SD3Error::Excluded) }
         }
-        {
-        let info = if let Some(i) = self.normal_info
-            { i } else {
-                bail!("Missing necessary information for normalization:\n {:#?}", self)
-            };
+        let value = self.value.ok_or(SD3Error::NoValue)?;
+        let value_unit = self.value_unit.ok_or(SD3Error::NoValueUnit)?;
 
-        let sample_time = info.sample_days 
+        let norm_val = if let Some(info) = self.normal_info
+        { 
+            let sample_time = info.sample_days 
                           + (info.sample_hours/24.0) 
                           + (info.sample_minutes/(24.0*60.0));
-        let norm_val = to_ngday_millioncells(
-            self.value, self.value_unit, 
-            info.sample_volume, info.sample_vol_unit, 
-            sample_time, info.cell_count);
-        
-        self.value = norm_val;
-        }
-        self.value_unit = ConcUnit::ng_day_millioncells;
-        //Add to notes field?
-        self.normal_info = None;
 
+            to_ngday_millioncells(
+                value, value_unit, 
+                info.sample_volume, info.sample_vol_unit, 
+                sample_time, info.cell_count
+            )
+        } else {
+            return Err(SD3Error::NoInfo)
+        };
+
+        self.value = Some(norm_val);
+        self.value_unit = Some(ConcUnit::ng_day_millioncells);
+        //Add to normalization info to the notes field?
+        self.normal_info = None;
 
         Ok(self)
     }
