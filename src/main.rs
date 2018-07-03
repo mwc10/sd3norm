@@ -24,7 +24,7 @@ struct Opt {
     /// Input sd3-formatted excel file
     #[structopt(parse(from_os_str))]
     input: PathBuf,
-    /// Output file name
+    /// Output file name, adds "-normalized" to INPUT if blank
     #[structopt(parse(from_os_str))]
     output: Option<PathBuf>,
 }
@@ -84,7 +84,7 @@ fn run(opts: Opt) -> Result<(), Error> {
             .from_range(&sheet)
             .context(format!("parsing sheet <{}>", s))?;
 
-        for (i, result) in rows.take(5).enumerate() {
+        for (i, result) in rows.enumerate() {
             let record: SD3 = match result {
                 Ok(r) => r,
                 Err(e) => {
