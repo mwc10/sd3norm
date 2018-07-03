@@ -191,6 +191,7 @@ where U: SI
     value * unit.si_factor()
 }
 /*
+#[inline]
 pub fn from_si<U>(value: f64, unit: U) -> f64
 where U: SI
 {

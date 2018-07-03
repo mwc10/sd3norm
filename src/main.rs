@@ -1,6 +1,8 @@
 #[macro_use] extern crate structopt;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate failure;
+#[macro_use] extern crate log;
+extern crate flexi_logger;
 extern crate serde;
 extern crate calamine;
 extern crate csv;
@@ -13,13 +15,15 @@ mod traits;
 use failure::{Error, ResultExt};
 use structopt::StructOpt;
 use calamine::{Reader, RangeDeserializerBuilder, open_workbook_auto};
+use flexi_logger::{Logger, default_format};
 use std::path::PathBuf;
 use std::fs::OpenOptions;
 use std::ffi::{OsStr};
 use sd3::SD3;
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "sd3norm")]
+//#[structopt(name = "sd3norm")]
+/// Read an SD3 (MIFC + normalization info) excel workbook and create one normalized MIFC CSV for each sheet
 struct Opt {
     /// Input sd3-formatted excel file
     #[structopt(parse(from_os_str))]
@@ -27,15 +31,29 @@ struct Opt {
     /// Output file name, adds "-normalized" to INPUT if blank
     #[structopt(parse(from_os_str))]
     output: Option<PathBuf>,
+    /// Print debug info based on the number of "v"s passed
+    #[structopt(short = "v", parse(from_occurrences))]
+    verbose: usize,
 }
 
 fn main() {
     let opts = Opt::from_args();
+    let log_level = match opts.verbose {
+        0 => "error",
+        1 => "info",
+        2 => "debug",
+        _ => "trace",
+    };
+
+    Logger::with_str(log_level)
+        .format(default_format)
+        .start()
+        .unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
 
     if let Err(e) = run(opts) {
         print_err(&e);
         match ::std::env::var("RUST_BACKTRACE").as_ref().map(|s| s.as_str()) {
-            Ok("1") => eprintln!("Backtrace:\n{}", e.backtrace()),
+            Ok("1") => error!("Backtrace:\n{}", e.backtrace()),
             _ => (),
         }
         ::std::process::exit(1);
@@ -69,7 +87,7 @@ fn run(opts: Opt) -> Result<(), Error> {
                 append_file_name(&mut out, format!("-{}",s));
                 out
             };
-        println!("Sheet #{}: {}\nOutput file: {:?}", i, s, &output);
+        info!("Sheet #{}: {}\nOutput file: {:?}", i, s, &output);
         let mut wtr = csv::Writer::from_writer(
             OpenOptions::new()
                 .write(true)
@@ -78,7 +96,7 @@ fn run(opts: Opt) -> Result<(), Error> {
                 .open(&output)?
         );
 
-        /* Deserialize the data into SD3 struct, then normalize each possible row*/
+        /* Deserialize the data into SD3 struct, then normalize each possible row, and serialize into output*/
         let mut rows = RangeDeserializerBuilder::new()
             .has_headers(true)
             .from_range(&sheet)
@@ -88,7 +106,7 @@ fn run(opts: Opt) -> Result<(), Error> {
             let record: SD3 = match result {
                 Ok(r) => r,
                 Err(e) => {
-                    println!("couldn't deserializing row {} in {}:\n{}", i+2, s, e); 
+                    info!("couldn't deserializing row {} in {}:\n{}", i+2, s, e); 
                     continue;
                 },
             };
@@ -96,7 +114,7 @@ fn run(opts: Opt) -> Result<(), Error> {
             let normalized = match record.into_normalized() {
                 Ok(n) => n,
                 Err(e) => {
-                    println!("couldn't normalize row {} in {}:\n{}", i+2, s, e);
+                    info!("couldn't normalize row {} in {}:\n{}", i+2, s, e);
                     continue;
                 },
             };
@@ -109,9 +127,9 @@ fn run(opts: Opt) -> Result<(), Error> {
 }
 
 fn print_err(e: &Error) {
-    eprintln!("Error: {}", e);
+    error!(": {}", e);
     for e in e.causes().skip(1) {
-        eprintln!("caused by: {}", e);
+        error!("caused by: {}", e);
     }
 }
 
