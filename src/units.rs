@@ -1,6 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 use serde::de::{self, Visitor, Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 use failure::Error;
 use traits::SI;
 
@@ -62,6 +63,14 @@ impl fmt::Display for VolUnit {
             l  => "L",
         };
         write!(f, "{}", display)
+    }
+}
+
+impl Serialize for VolUnit {
+    fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+    {
+        s.serialize_str(&format!("{}", self))
     }
 }
 
@@ -146,6 +155,14 @@ impl<'de> Deserialize<'de> for ConcUnit
         d.deserialize_str(ConcUnitVisitor)
     }
 
+}
+
+impl Serialize for ConcUnit {
+    fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+    {
+        s.serialize_str(&format!("{}", self))
+    }
 }
 
 struct ConcUnitVisitor;

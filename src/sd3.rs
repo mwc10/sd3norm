@@ -1,4 +1,5 @@
 use units::{ConcUnit, VolUnit, to_si};
+use mifc::MIFC;
 use traits::SI;
 
 #[derive(Debug, Fail)]
@@ -13,54 +14,22 @@ pub enum SD3Error {
     NoValueUnit,
 }
 //TODO: Deserialize optional string fields with a null || "" = None checking function
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SD3 {
-    #[serde(rename = "Chip ID")]
-    id: String,
-    #[serde(rename = "Assay Plate ID")]
-    assay_plate_id: Option<String>,
-    #[serde(rename = "Assay Well ID")]
-    assay_well_id: Option<String>,
-    #[serde(rename = "Method/Kit")]
-    method: String,
-    #[serde(rename = "Target/Analyte")]
-    target: String,
-    #[serde(rename = "Subtarget")]
-    subtarget: Option<String>,
-    #[serde(rename = "Sample Location")]
-    sample_loc: String,
-    #[serde(rename = "Day")]
-    day: f64,
-    #[serde(rename = "Hour")]
-    hour: f64,
-    #[serde(rename = "Minute")]
-    min: f64,
-    #[serde(rename = "Value")]
-    value: Option<f64>,
-    #[serde(rename = "Value Unit")]
-    value_unit: Option<ConcUnit>, 
-    #[serde(rename = "Caution Flag")]
-    flag: Option<String>,
-    #[serde(rename = "Exclude")]
-    exclude: Option<String>,
-    #[serde(rename = "Notes")]
-    notes: Option<String>,
-    #[serde(rename = "Replicate")]
-    replicate: Option<f32>,
-    #[serde(rename = "Cross Reference")]
-    xref: Option<String>,
+    #[serde(flatten)]
+    mifc: MIFC,
     #[serde(flatten)]
     normal_info: Option<Normalization>,
 }
 
 impl SD3 {
-    pub fn into_normalized(mut self) -> Result<Self, SD3Error> {
-        if let Some(ref f) = self.exclude {
+    pub fn into_normalized(self) -> Result<MIFC, SD3Error> {
+        if let Some(ref f) = self.mifc.exclude {
             if f != "" { return Err(SD3Error::Excluded) }
         }
-        let value = self.value.ok_or(SD3Error::NoValue)?;
-        let value_unit = self.value_unit.ok_or(SD3Error::NoValueUnit)?;
-
+        let value = self.mifc.value.ok_or(SD3Error::NoValue)?;
+        let value_unit = self.mifc.value_unit.ok_or(SD3Error::NoValueUnit)?;
+        // TODO: can self.normal_info be mapped like above? need fields to make note
         let norm_val = if let Some(info) = self.normal_info
         { 
             let sample_time = info.sample_days 
@@ -75,17 +44,17 @@ impl SD3 {
         } else {
             return Err(SD3Error::NoInfo)
         };
+        let mut normalized_mifc = self.mifc;
 
-        self.value = Some(norm_val);
-        self.value_unit = Some(ConcUnit::ng_day_millioncells);
-        //Add to normalization info to the notes field?
-        self.normal_info = None;
+        normalized_mifc.value = Some(norm_val);
+        normalized_mifc.value_unit = Some(ConcUnit::ng_day_millioncells);
+        //TODO: Add to normalization info to the notes field?
 
-        Ok(self)
+        Ok(normalized_mifc)
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Normalization {
     #[serde(rename = "Duration Sample Collection (days)")]
     sample_days: f64,
@@ -110,7 +79,6 @@ where V: SI, S: SI
 {
     let si_val = to_si(val, val_unit);
     let si_vol = to_si(vol, vol_unit);
-    println!("val {}\nvol {}", si_val, si_vol);
 
     // first go from the concentration (g/L) and sample volume (L) 
     // into grams/day/cell
