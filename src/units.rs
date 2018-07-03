@@ -192,10 +192,12 @@ where U: SI
 }
 /*
 #[inline]
-pub fn from_si<U>(value: f64, unit: U) -> f64
+pub fn from_si<U>(value: f64, to_unit: U) -> f64
 where U: SI
 {
-    value / unit.si_factor()
+    value / to_unit.si_factor()
 }
 */
+
+//TODO: add conversion tests
 

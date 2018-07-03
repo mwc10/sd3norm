@@ -95,3 +95,55 @@ where V: SI, S: SI
     // now, convert to the output ng/day/10^6 cells 
     gdaycell * 1_000_000_000.0 * 1_000_000.0
 }
+//TODO: Add test for ng/day/10^6 cells conversion
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use units::ConcUnit::*;
+    use units::VolUnit::*;
+    use std::fmt::Write;
+
+    struct Norm {
+        val: f64,
+        val_unit: ConcUnit,
+        info: Normalization,
+    }
+
+    static INPUTS: [Norm; 1] = [
+        Norm {
+            val: 132.7649,
+            val_unit: ng_ml,
+            info: Normalization{
+                sample_days: 1.0,
+                sample_hours: 0.0,
+                sample_minutes: 0.0,
+                sample_volume: 200.0,
+                sample_vol_unit: ul,
+                cell_count: 16768.0,
+            }
+        },
+    ];
+
+    static OUTPUTS: [f64; 1] = [
+        1835.801527,
+    ];
+
+    #[test]
+    fn ng_day_cell_normalization() {
+        let converted =  INPUTS.iter()
+            .map(|i| to_ngday_millioncells(
+                i.val, i.val_unit, 
+                i.info.sample_volume, i.info.sample_vol_unit, 
+                i.info.sample_days, i.info.cell_count
+            ))
+            .collect::<Vec<f64>>();
+        let mut received = String::with_capacity(16);
+        let mut expected = String::with_capacity(16);
+        for (r, e) in converted.iter().zip(OUTPUTS.iter()) {
+            write!(received, "{:.5}", r).unwrap();
+            write!(expected, "{:.5}", e).unwrap();
+            assert_eq!(received, expected, "r: {}| e: {}", r, e);
+        }
+    }
+}
