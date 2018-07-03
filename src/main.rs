@@ -85,13 +85,18 @@ fn run(opts: Opt) -> Result<(), Error> {
             .context(format!("parsing sheet <{}>", s))?;
 
         for (i, result) in rows.take(5).enumerate() {
-            let record: SD3 = result
-                .context(format!("deserializing row {} in sheet <{}>", i+2, s))?;
+            let record: SD3 = match result {
+                Ok(r) => r,
+                Err(e) => {
+                    println!("couldn't deserializing row {} in {}:\n{}", i+2, s, e); 
+                    continue;
+                },
+            };
 
             let normalized = match record.into_normalized() {
                 Ok(n) => n,
                 Err(e) => {
-                    println!("Row {} couldn't be normalized due to:\n{}", i+2, e);
+                    println!("couldn't normalize row {} in {}:\n{}", i+2, s, e);
                     continue;
                 },
             };
