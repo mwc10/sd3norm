@@ -29,26 +29,35 @@ impl SD3 {
         }
         let value = self.mifc.value.ok_or(SD3Error::NoValue)?;
         let value_unit = self.mifc.value_unit.ok_or(SD3Error::NoValueUnit)?;
-        // TODO: can self.normal_info be mapped like above? need fields to make note
-        let norm_val = if let Some(info) = self.normal_info
-        { 
-            let sample_time = info.sample_days 
+        let info = self.normal_info.ok_or(SD3Error::NoInfo)?;
+
+        let sample_time = info.sample_days 
                           + (info.sample_hours/24.0) 
                           + (info.sample_minutes/(24.0*60.0));
 
-            to_ngday_millioncells(
-                value, value_unit, 
-                info.sample_volume, info.sample_vol_unit, 
-                sample_time, info.cell_count
-            )
-        } else {
-            return Err(SD3Error::NoInfo)
-        };
+        let norm_val = to_ngday_millioncells(
+            value, value_unit, 
+            info.sample_volume, info.sample_vol_unit, 
+            sample_time, info.cell_count
+        );
+
         let mut normalized_mifc = self.mifc;
+        let note = format!("Normalized from {v:.5} {vu} by a {s} {su} sample over {d} {ds} with {c} cells ", 
+            v = value, vu = value_unit,
+            s = info.sample_volume, su = info.sample_vol_unit,
+            d = sample_time, ds = if sample_time > 1.0 {"days"} else {"day"},
+            c =info.cell_count
+        );
 
         normalized_mifc.value = Some(norm_val);
-        normalized_mifc.value_unit = Some(ConcUnit::ng_day_millioncells);
-        //TODO: Add to normalization info to the notes field?
+        normalized_mifc.value_unit = Some(ConcUnit::ng_day_millioncells);        
+        normalized_mifc.notes = if let Some(mut n) = normalized_mifc.notes {
+            if &n != "" { n.push_str(" || "); }
+            n.push_str(&note);
+            Some(n)
+        } else {
+            Some(note)
+        };
 
         Ok(normalized_mifc)
     }
@@ -86,7 +95,3 @@ where V: SI, S: SI
     // now, convert to the output ng/day/10^6 cells 
     gdaycell * 1_000_000_000.0 * 1_000_000.0
 }
-
-
-
-
