@@ -31,14 +31,11 @@ impl SD3 {
         let value_unit = self.mifc.value_unit.ok_or(SD3Error::NoValueUnit)?;
         let info = self.normal_info.ok_or(SD3Error::NoInfo)?;
 
-        let sample_time = info.sample_days 
-                          + (info.sample_hours/24.0) 
-                          + (info.sample_minutes/(24.0*60.0));
-
+        let sample_time = info.calc_sample_time();
         let norm_val = to_ngday_millioncells(value, value_unit, &info);
 
         let mut normalized_mifc = self.mifc;
-        let note = format!("Normalized from {v:.4} {vu} by a {s} {su} sample over {d} {ds} with {c} cells ", 
+        let note = format!("Normalized from {v:.4} {vu} by a {s} {su} sample over {d} {ds} with an estimated {c} cells ", 
             v = value, vu = value_unit,
             s = info.sample_volume, su = info.sample_vol_unit,
             d = sample_time, ds = if sample_time > 1.0 {"days"} else {"day"},
@@ -75,16 +72,22 @@ struct Normalization {
     cell_count: f64,
 }
 
+impl Normalization {
+    /// Calculate the duration of the sample in terms of days
+    #[inline]
+    fn calc_sample_time(&self) -> f64 {
+        self.sample_days 
+        + (self.sample_hours/24.0) 
+        + (self.sample_minutes/(24.0*60.0))
+    }
+}
+
 fn to_ngday_millioncells<V>( val: f64, val_unit: V, norm: &Normalization) -> f64
 where V: SI
 {
     let &Normalization{cell_count: cells, sample_volume: vol, sample_vol_unit: vol_unit, ..} = norm;
 
-    // Calculate total time in days
-    let days = norm.sample_days 
-               + (norm.sample_hours/24.0) 
-               + (norm.sample_minutes/(24.0*60.0));
-    
+    let days = norm.calc_sample_time();
     let si_val = to_si(val, val_unit);
     let si_vol = to_si(vol, vol_unit);
 
