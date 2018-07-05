@@ -118,7 +118,7 @@ fn run(opts: Opt) -> Result<(), Error> {
             let normalized = match record.into_normalized() {
                 Ok(n) => n,
                 Err(e) => {
-                    info!("couldn't normalize row {} in {}:\n{}", i+2, s, e);
+                    info!("did not normalize row {} in {}:\n{}", i+2, s, e);
                     continue;
                 },
             };
