@@ -79,7 +79,9 @@ fn run(opts: Opt) -> Result<(), Error> {
     for (i, s) in sheets.iter().enumerate() {
         let sheet = workbook.worksheet_range(s).unwrap()?;
 
-        /* Generate a writer to output the normalized values from this sheet */
+        /* Generate a writer to output the normalized values from this sheet 
+         * If there is only one sheet, don't append the sheet name to the output file name
+        **/
         let output = if sheet_sum == 1 {
                 output_base.clone() // shouldn't need this clone, how to rewrite...
             } else {

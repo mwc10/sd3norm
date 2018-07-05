@@ -108,7 +108,7 @@ mod tests {
         info: Normalization,
     }
 
-    static INPUTS: [Norm; 3] = [
+    static INPUTS: [Norm; 7] = [
         Norm {
             val: 153.914,
             val_unit: ng_ml,
@@ -145,14 +145,66 @@ mod tests {
                 cell_count: 80000.0,
             }
         },
+        Norm {
+            val: 1543.054,
+            val_unit: mg_dl,
+            info: Normalization{
+                sample_days: 1.0,
+                sample_hours: 0.0,
+                sample_minutes: 0.0,
+                sample_volume: 200.0,
+                sample_vol_unit: ul,
+                cell_count: 50000.0,
+            }
+        },
+        Norm {
+            val: 484321.0,
+            val_unit: mg_dl,
+            info: Normalization{
+                sample_days: 2.0,
+                sample_hours: 5.0,
+                sample_minutes: 0.0,
+                sample_volume: 500.0,
+                sample_vol_unit: ul,
+                cell_count: 50000.0,
+            }
+        },
+        Norm {
+            val: 15.9,
+            val_unit: mg_dl,
+            info: Normalization{
+                sample_days: 0.0,
+                sample_hours: 20.0,
+                sample_minutes: 2.0,
+                sample_volume: 100.0,
+                sample_vol_unit: ul,
+                cell_count: 50000.0,
+            }
+        },
+        Norm {
+            val: 0.87,
+            val_unit: mg_dl,
+            info: Normalization{
+                sample_days: 0.0,
+                sample_hours: 10.0,
+                sample_minutes: 30.0,
+                sample_volume: 0.1,
+                sample_vol_unit: ml,
+                cell_count: 50000.0,
+            }
+        },
     ];
 
-    static OUTPUTS: [f64; 3] = [
+    static OUTPUTS: [f64; 7] = [
         1835.801527,
         16224.89623,
         4017.33,
+        61722160.0,
+        21931516981.0,
+        380965.0582,
+        39771.42857,
     ];
-    /// Compare doubles A and B within percent tolerance tol
+    /// Compare doubles `A` and `B` within percent tolerance `tol`
     fn double_compare(a: f64, b: f64, tol: f64) -> bool {
         if !a.is_finite() || !b.is_finite()  { return false; }
         
