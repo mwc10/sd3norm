@@ -22,7 +22,6 @@ use std::ffi::{OsStr};
 use sd3::SD3;
 
 #[derive(StructOpt, Debug)]
-//#[structopt(name = "sd3norm")]
 /// Read an SD3 (MIFC + normalization info) excel workbook and create one normalized MIFC CSV for each sheet
 struct Opt {
     /// Input sd3-formatted excel file
@@ -79,6 +78,7 @@ fn run(opts: Opt) -> Result<(), Error> {
 
     for (i, s) in sheets.iter().enumerate() {
         let sheet = workbook.worksheet_range(s).unwrap()?;
+
         /* Generate a writer to output the normalized values from this sheet */
         let output = if sheet_sum == 1 {
                 output_base.clone() // shouldn't need this clone, how to rewrite...
@@ -88,6 +88,7 @@ fn run(opts: Opt) -> Result<(), Error> {
                 out
             };
         info!("Sheet #{}: {}\nOutput file: {:?}", i, s, &output);
+
         let mut wtr = csv::Writer::from_writer(
             OpenOptions::new()
                 .write(true)
@@ -97,6 +98,7 @@ fn run(opts: Opt) -> Result<(), Error> {
         );
 
         /* Deserialize the data into SD3 struct, then normalize each possible row, and serialize into output*/
+        // TODO: match on this error, and continue?
         let mut rows = RangeDeserializerBuilder::new()
             .has_headers(true)
             .from_range(&sheet)

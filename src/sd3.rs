@@ -35,14 +35,10 @@ impl SD3 {
                           + (info.sample_hours/24.0) 
                           + (info.sample_minutes/(24.0*60.0));
 
-        let norm_val = to_ngday_millioncells(
-            value, value_unit, 
-            info.sample_volume, info.sample_vol_unit, 
-            sample_time, info.cell_count
-        );
+        let norm_val = to_ngday_millioncells(value, value_unit, &info);
 
         let mut normalized_mifc = self.mifc;
-        let note = format!("Normalized from {v:.5} {vu} by a {s} {su} sample over {d} {ds} with {c} cells ", 
+        let note = format!("Normalized from {v:.4} {vu} by a {s} {su} sample over {d} {ds} with {c} cells ", 
             v = value, vu = value_unit,
             s = info.sample_volume, su = info.sample_vol_unit,
             d = sample_time, ds = if sample_time > 1.0 {"days"} else {"day"},
@@ -79,30 +75,32 @@ struct Normalization {
     cell_count: f64,
 }
 
-fn to_ngday_millioncells<V, S>(
-    val: f64, val_unit: V, 
-    vol: f64, vol_unit: S, 
-    sample_days: f64, cells: f64
-) -> f64
-where V: SI, S: SI
+fn to_ngday_millioncells<V>( val: f64, val_unit: V, norm: &Normalization) -> f64
+where V: SI
 {
+    let &Normalization{cell_count: cells, sample_volume: vol, sample_vol_unit: vol_unit, ..} = norm;
+
+    // Calculate total time in days
+    let days = norm.sample_days 
+               + (norm.sample_hours/24.0) 
+               + (norm.sample_minutes/(24.0*60.0));
+    
     let si_val = to_si(val, val_unit);
     let si_vol = to_si(vol, vol_unit);
 
     // first go from the concentration (g/L) and sample volume (L) 
-    // into grams/day/cell
-    let gdaycell = si_val * si_vol / sample_days / cells;
+    // into nanograms/day/cell
+    let ng = si_val * si_vol * 1_000_000_000.0;
+    let ngdaycell = ng / days / cells;
     // now, convert to the output ng/day/10^6 cells 
-    gdaycell * 1_000_000_000.0 * 1_000_000.0
+    ngdaycell * 1_000_000.0
 }
-//TODO: Add test for ng/day/10^6 cells conversion
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use units::ConcUnit::*;
     use units::VolUnit::*;
-    use std::fmt::Write;
 
     struct Norm {
         val: f64,
@@ -110,9 +108,9 @@ mod tests {
         info: Normalization,
     }
 
-    static INPUTS: [Norm; 1] = [
+    static INPUTS: [Norm; 3] = [
         Norm {
-            val: 132.7649,
+            val: 153.914,
             val_unit: ng_ml,
             info: Normalization{
                 sample_days: 1.0,
@@ -123,27 +121,65 @@ mod tests {
                 cell_count: 16768.0,
             }
         },
+        Norm {
+            val: 1360.2953,
+            val_unit: ng_ml,
+            info: Normalization{
+                sample_days: 1.0,
+                sample_hours: 0.0,
+                sample_minutes: 0.0,
+                sample_volume: 200.0,
+                sample_vol_unit: ul,
+                cell_count: 16768.0,
+            }
+        },
+        Norm {
+            val: 1071.288,
+            val_unit: ng_ml,
+            info: Normalization{
+                sample_days: 1.0,
+                sample_hours: 0.0,
+                sample_minutes: 0.0,
+                sample_volume: 300.0,
+                sample_vol_unit: ul,
+                cell_count: 80000.0,
+            }
+        },
     ];
 
-    static OUTPUTS: [f64; 1] = [
+    static OUTPUTS: [f64; 3] = [
         1835.801527,
+        16224.89623,
+        4017.33,
     ];
+    /// Compare doubles A and B within percent tolerance tol
+    fn double_compare(a: f64, b: f64, tol: f64) -> bool {
+        if !a.is_finite() || !b.is_finite()  { return false; }
+        
+        let diff = (a-b).abs();
+        let a = a.abs();
+        let b = b.abs();
+        let largest = a.max(b);
+        
+        if diff <= (largest * tol / 100.0)
+        { true } else { false }
+    }
 
     #[test]
     fn ng_day_cell_normalization() {
-        let converted =  INPUTS.iter()
-            .map(|i| to_ngday_millioncells(
-                i.val, i.val_unit, 
-                i.info.sample_volume, i.info.sample_vol_unit, 
-                i.info.sample_days, i.info.cell_count
-            ))
-            .collect::<Vec<f64>>();
-        let mut received = String::with_capacity(16);
-        let mut expected = String::with_capacity(16);
-        for (r, e) in converted.iter().zip(OUTPUTS.iter()) {
-            write!(received, "{:.5}", r).unwrap();
-            write!(expected, "{:.5}", e).unwrap();
-            assert_eq!(received, expected, "r: {}| e: {}", r, e);
-        }
+        let percent_tolerance = 0.001;
+
+        let all_equal = INPUTS.iter()
+            .map(|i| to_ngday_millioncells(i.val, i.val_unit, &i.info))
+            .zip(OUTPUTS.iter())
+            .enumerate()
+            .inspect(|(i, (c, e))|
+                println!("\nSet #{}\ncalculated: {} | expected: {}", i, c, e)
+            )
+            .all(|(_i,(c,e))|
+                double_compare(c, *e, percent_tolerance)
+            );
+
+        assert!(all_equal);
     }
 }

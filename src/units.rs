@@ -10,6 +10,7 @@ use traits::SI;
 pub enum VolUnit {
     ml,
     ul,
+    dl,
     l,
 }
 
@@ -17,6 +18,7 @@ pub enum VolUnit {
 #[allow(non_camel_case_types)]
 pub enum ConcUnit {
     ng_ml,
+    mg_dl,
     g_l,
     //Had to shoe-horn ng/day/10^6 cells into here; not a normal concentration, though.
     ng_day_millioncells,
@@ -35,6 +37,7 @@ impl SI for VolUnit {
         match self {
             ml => 1.0/1_000.0,
             ul => 1.0/1_000_000.0,
+            dl => 1.0/10.0,
             l  => 1.0,
         }
     }
@@ -48,6 +51,7 @@ impl FromStr for VolUnit {
         match s {
             "uL" | "ul" | "µL" | "µl" => Ok(ul),
             "ml" | "mL" => Ok(ml),
+            "dl" | "dL" => Ok(dl),
             "l" | "L" => Ok(l),
             _ => bail!("Unknown volume unit string <{}>", s)
         }
@@ -60,6 +64,7 @@ impl fmt::Display for VolUnit {
         let display = match self {
             ml => "mL",
             ul => "µL",
+            dl => "dL",
             l  => "L",
         };
         write!(f, "{}", display)
@@ -114,6 +119,7 @@ impl SI for ConcUnit {
         match self {
             ng_ml => 1.0/1_000_000.0,
             g_l => 1.0,
+            mg_dl => 1.0 / 100.0,
             ng_day_millioncells => 1.0/1_000_000_000.0,
         }
     }
@@ -129,6 +135,7 @@ impl FromStr for ConcUnit {
         match s {
             "ng/mL" | "ng/ml" => Ok(ng_ml),
             "g/l" | "g/L" => Ok(g_l),
+            "mg/dl" | "mg/dL" => Ok(mg_dl),
             "ng/day/10^6 cells" | "ng/day/10^6cells" => Ok(ng_day_millioncells),
             _ => bail!("Unknown concentration unit string <{}>", s)
         }
@@ -141,6 +148,7 @@ impl fmt::Display for ConcUnit {
         let display = match self {
             ng_ml => "ng/mL",
             g_l => "g/L",
+            mg_dl => "mg/dL",
             ng_day_millioncells => "ng/day/10^6 cells",
         };
         write!(f, "{}", display)
