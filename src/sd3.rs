@@ -108,7 +108,7 @@ mod tests {
         info: Normalization,
     }
 
-    static INPUTS: [Norm; 7] = [
+    static INPUTS: [Norm; 10] = [
         Norm {
             val: 153.914,
             val_unit: ng_ml,
@@ -193,9 +193,45 @@ mod tests {
                 cell_count: 50000.0,
             }
         },
+        Norm {
+            val: 542.0,
+            val_unit: pg_ml,
+            info: Normalization{
+                sample_days: 3.0,
+                sample_hours: 15.0,
+                sample_minutes: 1.0,
+                sample_volume: 200.0,
+                sample_vol_unit: ul,
+                cell_count: 20000.0,
+            }
+        },
+        Norm {
+            val: 12.0556,
+            val_unit: pg_ml,
+            info: Normalization{
+                sample_days: 1.0,
+                sample_hours: 0.0,
+                sample_minutes: 0.0,
+                sample_volume: 0.1,
+                sample_vol_unit: ml,
+                cell_count: 20000.0,
+            }
+        },
+        Norm {
+            val: 0.00465,
+            val_unit: pg_ml,
+            info: Normalization{
+                sample_days: 0.0,
+                sample_hours: 2.0,
+                sample_minutes: 30.0,
+                sample_volume: 0.01,
+                sample_vol_unit: l,
+                cell_count: 20000.0,
+            }
+        },
     ];
 
-    static OUTPUTS: [f64; 7] = [
+    static OUTPUTS: [f64; 10] = [
         1835.801527,
         16224.89623,
         4017.33,
@@ -203,9 +239,12 @@ mod tests {
         21931516981.0,
         380965.0582,
         39771.42857,
+        1.494886037,
+        0.060278,
+        0.02232,
     ];
     /// Compare doubles `A` and `B` within percent tolerance `tol`
-    fn double_compare(a: f64, b: f64, tol: f64) -> bool {
+    fn double_comparable(a: f64, b: f64, tol: f64) -> bool {
         if !a.is_finite() || !b.is_finite()  { return false; }
         
         let diff = (a-b).abs();
@@ -229,7 +268,7 @@ mod tests {
                 println!("\nSet #{}\ncalculated: {} | expected: {}", i, c, e)
             )
             .all(|(_i,(c,e))|
-                double_compare(c, *e, percent_tolerance)
+                double_comparable(c, *e, percent_tolerance)
             );
 
         assert!(all_equal);

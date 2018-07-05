@@ -17,7 +17,9 @@ pub enum VolUnit {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum ConcUnit {
+    pg_ml,
     ng_ml,
+    mg_ml,
     mg_dl,
     g_l,
     //Had to shoe-horn ng/day/10^6 cells into here; not a normal concentration, though.
@@ -117,7 +119,9 @@ impl SI for ConcUnit {
         use self::ConcUnit::*;
         // SI base unit are grams per liter (equivalent to mg/mL)
         match self {
+            pg_ml => 1.0/1_000_000_000.0,
             ng_ml => 1.0/1_000_000.0,
+            mg_ml => 1.0,
             g_l => 1.0,
             mg_dl => 1.0 / 100.0,
             ng_day_millioncells => 1.0/1_000_000_000.0,
@@ -133,7 +137,9 @@ impl FromStr for ConcUnit {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use self::ConcUnit::*;
         match s {
+            "pg/ml" | "pg/mL" => Ok(pg_ml),
             "ng/mL" | "ng/ml" => Ok(ng_ml),
+            "mg/mL" | "mg/ml" => Ok(mg_ml),
             "g/l" | "g/L" => Ok(g_l),
             "mg/dl" | "mg/dL" => Ok(mg_dl),
             "ng/day/10^6 cells" | "ng/day/10^6cells" => Ok(ng_day_millioncells),
@@ -146,7 +152,9 @@ impl fmt::Display for ConcUnit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::ConcUnit::*;
         let display = match self {
+            pg_ml => "pg/mL",
             ng_ml => "ng/mL",
+            mg_ml => "mg/mL",
             g_l => "g/L",
             mg_dl => "mg/dL",
             ng_day_millioncells => "ng/day/10^6 cells",
