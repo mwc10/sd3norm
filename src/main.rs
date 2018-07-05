@@ -9,8 +9,7 @@ extern crate csv;
 
 mod sd3;
 mod mifc;
-mod units;
-mod traits;
+mod si;
 
 use failure::{Error, ResultExt};
 use structopt::StructOpt;

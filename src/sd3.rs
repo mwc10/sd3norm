@@ -1,6 +1,5 @@
-use units::{ConcUnit, VolUnit, to_si};
+use si::{SIUnit, self};
 use mifc::MIFC;
-use traits::SI;
 
 #[derive(Debug, Fail)]
 pub enum SD3Error {
@@ -43,7 +42,7 @@ impl SD3 {
         );
 
         normalized_mifc.value = Some(norm_val);
-        normalized_mifc.value_unit = Some(ConcUnit::ng_day_millioncells);        
+        normalized_mifc.value_unit = Some(SIUnit::ng_day_millioncells);        
         normalized_mifc.notes = if let Some(mut n) = normalized_mifc.notes {
             if &n != "" { n.push_str(" || "); }
             n.push_str(&note);
@@ -67,7 +66,7 @@ struct Normalization {
     #[serde(rename = "Sample Volume")]
     sample_volume: f64,
     #[serde(rename = "Sample Volume Unit")]
-    sample_vol_unit: VolUnit,
+    sample_vol_unit: SIUnit,
     #[serde(rename = "Estimated Cell Number")]
     cell_count: f64,
 }
@@ -82,32 +81,35 @@ impl Normalization {
     }
 }
 
-fn to_ngday_millioncells<V>( val: f64, val_unit: V, norm: &Normalization) -> f64
-where V: SI
+fn to_ngday_millioncells(val: f64, val_unit: SIUnit, norm: &Normalization) -> f64
 {
+    use self::SIUnit::*;
+
     let &Normalization{cell_count: cells, sample_volume: vol, sample_vol_unit: vol_unit, ..} = norm;
 
     let days = norm.calc_sample_time();
-    let si_val = to_si(val, val_unit);
-    let si_vol = to_si(vol, vol_unit);
+    let si_val = si::convert((val, val_unit), g_l).unwrap();
+    let si_vol = si::convert((vol, vol_unit), l).unwrap();
+    debug!("conc: {:.5} {} to SI {:.5} {}", val, val_unit, si_val, g_l);
+    debug!("vol: {:.5} {} to SI {:.5} {}",  vol, vol_unit, si_vol, l);
 
     // first go from the concentration (g/L) and sample volume (L) 
     // into nanograms/day/cell
-    let ng = si_val * si_vol * 1_000_000_000.0;
-    let ngdaycell = ng / days / cells;
-    // now, convert to the output ng/day/10^6 cells 
+    let made_ng = si::convert((si_val * si_vol, g), ng).unwrap();
+    debug!("produced ng: {:.5} over {:.3} day(s)", made_ng, days);
+    let ngdaycell = made_ng / days / cells;
+    // now, multiple by 10^6 to make rate by million cells 
     ngdaycell * 1_000_000.0
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use units::ConcUnit::*;
-    use units::VolUnit::*;
+    use si::SIUnit::*;
 
     struct Norm {
         val: f64,
-        val_unit: ConcUnit,
+        val_unit: SIUnit,
         info: Normalization,
     }
 

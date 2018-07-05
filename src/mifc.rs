@@ -1,4 +1,4 @@
-use units::{ConcUnit};
+use si::{SIUnit};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MIFC {
@@ -25,7 +25,7 @@ pub struct MIFC {
     #[serde(rename = "Value")]
     pub value: Option<f64>,
     #[serde(rename = "Value Unit")]
-    pub value_unit: Option<ConcUnit>, 
+    pub value_unit: Option<SIUnit>, 
     #[serde(rename = "Caution Flag")]
     pub flag: Option<String>,
     #[serde(rename = "Exclude")]
