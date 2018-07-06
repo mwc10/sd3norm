@@ -38,7 +38,7 @@ impl SD3 {
             v = value, vu = value_unit,
             s = info.sample_volume, su = info.sample_vol_unit,
             d = sample_time, ds = if sample_time > 1.0 {"days"} else {"day"},
-            c =info.cell_count
+            c = info.cell_count
         );
 
         normalized_mifc.value = Some(norm_val);
@@ -105,6 +105,7 @@ fn to_ngday_millioncells(val: f64, val_unit: SIUnit, norm: &Normalization) -> f6
 #[cfg(test)]
 mod tests {
     use super::*;
+    use utils::double_comparable;
     use si::SIUnit::*;
 
     struct Norm {
@@ -248,22 +249,10 @@ mod tests {
         0.060278,
         0.02232,
     ];
-    /// Compare doubles `A` and `B` within percent tolerance `tol`
-    fn double_comparable(a: f64, b: f64, tol: f64) -> bool {
-        if !a.is_finite() || !b.is_finite()  { return false; }
-        
-        let diff = (a-b).abs();
-        let a = a.abs();
-        let b = b.abs();
-        let largest = a.max(b);
-        
-        if diff <= (largest * tol / 100.0)
-        { true } else { false }
-    }
 
     #[test]
     fn ng_day_cell_normalization() {
-        let percent_tolerance = 0.001;
+        const PERCENT_TOLERANCE: f64 = 0.001;
 
         let all_equal = INPUTS.iter()
             .map(|i| to_ngday_millioncells(i.val, i.val_unit, &i.info))
@@ -273,7 +262,7 @@ mod tests {
                 println!("\nSet #{}\ncalculated: {} | expected: {}", i, c, e)
             )
             .all(|(_i,(c,e))|
-                double_comparable(c, *e, percent_tolerance)
+                double_comparable(c, *e, PERCENT_TOLERANCE)
             );
 
         assert!(all_equal);

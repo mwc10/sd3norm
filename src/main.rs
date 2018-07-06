@@ -10,6 +10,7 @@ extern crate csv;
 mod sd3;
 mod mifc;
 mod si;
+mod utils;
 
 use failure::{Error, ResultExt};
 use structopt::StructOpt;

@@ -98,25 +98,25 @@ impl SIUnit {
         use self::SIUnit::*;
 
         match self {
-            pg_ml => 1.0 / 1_000_000_000.0,
-            ng_ml => 1.0 / 1_000_000.0,
+            pg_ml => 1e-9,
+            ng_ml => 1e-6,
             mg_ml => 1.0,
-            mg_dl => 1.0 / 100.0,
+            mg_dl => 1e-2,
             g_l => 1.0,
 
-            ml => 1.0 / 1_000.0,
-            ul => 1.0 / 1_000_000.0,
-            dl => 1.0 / 10.0,
+            ml => 1e-3,
+            ul => 1e-6,
+            dl => 1e-1,
             l => 1.0,
 
             g => 1.0,
-            ng => 1.0 / 1_000_000_000.0,
+            ng => 1e-9,
 
             g_day => 1.0,
-            ng_day => 1.0 / 1_000_000_000.0,
+            ng_day => 1e-9,
             /* These seem off... */
             g_day_cell => 1.0,
-            ng_day_cell => 1.0 / 1_000_000_000.0,
+            ng_day_cell => 1e-9,
             ng_day_millioncells => 1.0 / (1_000_000_000.0 * 1_000_000_000.0),
         }
     }
@@ -188,13 +188,10 @@ impl<'de> Visitor<'de> for SIUnitVisitor {
     fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
     where E: de::Error
     {
-        match Self::Value::from_str(s) {
-            Ok(v) => Ok(v),
-            Err(e) => Err(E::custom(format!("{}",e))),
-        }
+        Self::Value::from_str(s)
+            .map_err( |e| E::custom(format!("{}",e)) )
     }
 }
-
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum UnitType {
@@ -215,4 +212,42 @@ pub fn convert((val, unit): (f64, SIUnit), to: SIUnit) -> Result<f64, SIError> {
     let to_fact = to.si_factor().recip();
     
     Ok(val * (from_fact * to_fact))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use utils::double_comparable;
+    const TOL: f64 = 1e-9;
+
+    #[test]
+    fn mass_conversion() {
+        use self::SIUnit::*;
+
+        assert!(double_comparable(convert((1e9, ng), g).unwrap(), 1.0, TOL), "10^9 ng to g");
+        assert!(double_comparable(convert((1e-9, g), ng).unwrap(), 1.0, TOL), "10^-9 g to ng");
+        assert!(double_comparable(convert((100.0, ng), ng).unwrap(), 100.0, TOL), "100 ng to ng");
+        assert!(double_comparable(convert((25.0, g), g).unwrap(), 25.0, TOL), "25 g to g");
+    }
+
+    #[test]
+    fn volume_conversion() {
+        use self::SIUnit::*;
+
+        assert!(double_comparable(convert((100.0, ul), ml).unwrap(), 0.1, TOL), "100 ul to ml");
+        assert!(double_comparable(convert((50.0, dl), ul).unwrap(), 5.0e6, TOL), "50 dl to ul");
+        assert!(double_comparable(convert((10.0, dl), l).unwrap(), 1.0, TOL), "10 dl to l");
+        assert!(double_comparable(convert((385.0, ml), dl).unwrap(), 3.85, TOL), "385 ml to dl");
+        assert!(double_comparable(convert((2054.0, ml), l).unwrap(), 2.054, TOL), "2054 ml to l");
+    }
+
+    #[test]
+    fn concentration_conversion() {
+        use self::SIUnit::*;
+
+        assert!(double_comparable(convert((100.0, pg_ml), g_l).unwrap(), 100e-9, TOL), "100 pg_ml to g_l");
+        assert!(double_comparable(convert((20.0, ng_ml), g_l).unwrap(), 20e-6, TOL), "20 ug_ml to g_l");
+        assert!(double_comparable(convert((32.0, mg_ml), g_l).unwrap(), 32.0, TOL), "32 mg_ml to g_l");
+        assert!(double_comparable(convert((1.0, mg_dl), g_l).unwrap(), 1e-2, TOL), "1 mg_dl to g_l");
+    }
 }
