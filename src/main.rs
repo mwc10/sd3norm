@@ -27,12 +27,14 @@ struct Opt {
     /// Input sd3-formatted excel file
     #[structopt(parse(from_os_str))]
     input: PathBuf,
-    /// Output file name, adds "-normalized" to INPUT if blank
-    #[structopt(parse(from_os_str))]
-    output: Option<PathBuf>,
+    /// Append to INPUT file name when naming output file, defaults to "normalized"
+    append: Option<String>,
     /// Print debug info based on the number of "v"s passed
     #[structopt(short = "v", parse(from_occurrences))]
     verbose: usize,
+    /// Optional directory for output
+    #[structopt(short = "d", long = "out-dir", parse(from_os_str))]
+    out_dir: Option<PathBuf>, 
 }
 
 fn main() {
@@ -61,14 +63,21 @@ fn main() {
 
 fn run(opts: Opt) -> Result<(), Error> {
     /* Get output base path, and read input excel workbook */
-    let output_base = if let Some(path) = opts.output {
-        path
+    let output_base = if let Some(mut dir) = opts.out_dir {
+        //TODO: check if directory exists first, if not, make
+        if !dir.is_dir() { bail!("Path passed to \"--out-dir\" was not a directory") }
+        info!("input directory: {:?}", dir);
+        info!("input filename: {:?}", dir.file_name());
+        let input_filename = opts.input.file_name().expect("a file for input");
+        dir.push(input_filename);
+        dir.set_extension("csv");
+        dir
     } else {
-        let mut output = opts.input.clone();
-        append_file_name(&mut output, "-normalized");
-        output.set_extension("csv");
-        output
+        opts.input.with_extension("csv")
     };
+    info!("output base: {:?}", output_base);
+    let append_str = opts.append.as_ref().map_or("normalized", String::as_ref);
+
     let mut workbook = open_workbook_auto(opts.input)
         .context("opening input xlsx workbook")?;
     /* Iterate over the sheets in a workbook */
@@ -82,13 +91,17 @@ fn run(opts: Opt) -> Result<(), Error> {
         /* Generate a writer to output the normalized values from this sheet 
          * If there is only one sheet, don't append the sheet name to the output file name
         **/
-        let output = if sheet_sum == 1 {
-                output_base.clone() // shouldn't need this clone, how to rewrite...
-            } else {
-                let mut out = output_base.clone();
-                append_file_name(&mut out, format!("-{}",s));
-                out
-            };
+        let output = {
+            let mut out = output_base.clone();
+            let add_sheet = sheet_sum > 1;
+            let appended_info = format!("{s_h}{s}-{a}", 
+                s_h = if add_sheet {"-"} else {""},
+                s = if add_sheet {s} else {""},
+                a =  append_str
+            );
+            append_file_name(&mut out, &appended_info);
+            out
+        };
         info!("Sheet #{}: {}\nOutput file: {:?}", i, s, &output);
 
         let mut wtr = csv::Writer::from_writer(

@@ -1,4 +1,5 @@
 /// Compare doubles `A` and `B` within percent tolerance `tol`
+#[test]
 pub fn double_comparable(a: f64, b: f64, tol: f64) -> bool {
     if !a.is_finite() || !b.is_finite()  { return false; }
     
