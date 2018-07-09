@@ -47,7 +47,7 @@ fn main() {
     Logger::with_str(log_level)
         .format(default_format)
         .start()
-        .unwrap_or_else(|e|{panic!("Logger initialization failed with {}",e)});
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {}",e) );
 
     if let Err(e) = run(opts) {
         print_err(&e);
