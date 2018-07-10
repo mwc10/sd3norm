@@ -10,14 +10,15 @@ extern crate csv;
 mod sd3;
 mod mifc;
 mod si;
-mod utils;
+#[cfg(test)] mod utils;
 
 use failure::{Error, ResultExt};
 use structopt::StructOpt;
 use calamine::{Reader, RangeDeserializerBuilder, open_workbook_auto};
 use flexi_logger::{Logger, default_format};
-use std::path::PathBuf;
-use std::fs::OpenOptions;
+use std::path::{Path, PathBuf};
+use std::fmt;
+use std::fs::{OpenOptions, self};
 use std::ffi::{OsStr};
 use sd3::SD3;
 
@@ -62,24 +63,45 @@ fn main() {
 }
 
 fn run(opts: Opt) -> Result<(), Error> {
-    /* Get output base path, and read input excel workbook */
+    /* Convert collection of input files or directories into workbooks paths */
+    let workbook = opts.input;
+    debug!("Workbooks: {:#?}", &workbook);
+
+    /* Get output base path by appending the value of optional directory flag */
     let output_base = if let Some(mut dir) = opts.out_dir {
-        //TODO: check if directory exists first, if not, make
-        if !dir.is_dir() { bail!("Path passed to \"--out-dir\" was not a directory") }
-        info!("input directory: {:?}", dir);
-        info!("input filename: {:?}", dir.file_name());
-        let input_filename = opts.input.file_name().expect("a file for input");
+        if !dir.exists() { 
+            fs::create_dir_all(&dir)?;
+        } else if !dir.is_dir() { 
+            bail!("Path <{:?}> passed to \"--out-dir\" is not a directory", &dir);
+        }
+
+        debug!("Output directory: {:?}", dir);
+
+        let input_filename = workbook.file_name()
+            .expect("the input workbook was not a file");
+
         dir.push(input_filename);
         dir.set_extension("csv");
+
         dir
     } else {
-        opts.input.with_extension("csv")
+        workbook.with_extension("csv")
     };
-    info!("output base: {:?}", output_base);
-    let append_str = opts.append.as_ref().map_or("normalized", String::as_ref);
 
-    let mut workbook = open_workbook_auto(opts.input)
-        .context("opening input xlsx workbook")?;
+    /* Get the value to append to the end of the output, or use the default */
+    let append_str = opts.append.as_ref().map_or("normalized", String::as_ref);
+    debug!("output base: {:?}\nappend: {}", output_base, &append_str);
+
+    normalize_workbook(&workbook, &output_base, &append_str)?;
+
+    Ok(())
+}
+
+fn normalize_workbook<P>(wb_path: P, output_base: P, append: &str) -> Result<(), Error>
+where P: AsRef<Path> + fmt::Debug
+{
+    let mut workbook = open_workbook_auto(&wb_path)
+        .context(format!("opening excel workbook <{:?}>", &wb_path))?;
     /* Iterate over the sheets in a workbook */
     // TODO: add sheet flag to CLI, and only process that sheet.
     let sheets = workbook.sheet_names().to_vec();
@@ -92,17 +114,18 @@ fn run(opts: Opt) -> Result<(), Error> {
          * If there is only one sheet, don't append the sheet name to the output file name
         **/
         let output = {
-            let mut out = output_base.clone();
+            let mut out = output_base.as_ref().to_path_buf();
             let add_sheet = sheet_sum > 1;
             let appended_info = format!("{s_h}{s}-{a}", 
                 s_h = if add_sheet {"-"} else {""},
                 s = if add_sheet {s} else {""},
-                a =  append_str
+                a =  append
             );
             append_file_name(&mut out, &appended_info);
             out
         };
-        info!("Sheet #{}: {}\nOutput file: {:?}", i, s, &output);
+        
+        info!("{:?} - {} (#{}):\nOutput file: {:?}", &wb_path, s, i, &output);
 
         let mut wtr = csv::Writer::from_writer(
             OpenOptions::new()
@@ -113,11 +136,16 @@ fn run(opts: Opt) -> Result<(), Error> {
         );
 
         /* Deserialize the data into SD3 struct, then normalize each possible row, and serialize into output*/
-        // TODO: match on this error, and continue?
-        let mut rows = RangeDeserializerBuilder::new()
+        let mut rows = match RangeDeserializerBuilder::new()
             .has_headers(true)
             .from_range(&sheet)
-            .context(format!("parsing sheet <{}>", s))?;
+        {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("issue parsing sheet <{}>\n{}", s, e);
+                continue;
+            } 
+        };
 
         for (i, result) in rows.enumerate() {
             let record: SD3 = match result {
@@ -139,7 +167,6 @@ fn run(opts: Opt) -> Result<(), Error> {
             wtr.serialize(normalized)?;
         }
     }
-
     Ok(())
 }
 

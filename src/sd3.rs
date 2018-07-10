@@ -90,13 +90,13 @@ fn to_ngday_millioncells(val: f64, val_unit: SIUnit, norm: &Normalization) -> f6
     let days = norm.calc_sample_time();
     let si_val = si::convert((val, val_unit), g_l).unwrap();
     let si_vol = si::convert((vol, vol_unit), l).unwrap();
-    debug!("conc: {:.5} {} to SI {:.5} {}", val, val_unit, si_val, g_l);
-    debug!("vol: {:.5} {} to SI {:.5} {}",  vol, vol_unit, si_vol, l);
+    trace!("conc: {:.5} {} to SI {:.5} {}", val, val_unit, si_val, g_l);
+    trace!("vol: {:.5} {} to SI {:.5} {}",  vol, vol_unit, si_vol, l);
 
     // first go from the concentration (g/L) and sample volume (L) 
     // into nanograms/day/cell
     let made_ng = si::convert((si_val * si_vol, g), ng).unwrap();
-    debug!("produced ng: {:.5} over {:.3} day(s)", made_ng, days);
+    trace!("produced ng: {:.5} over {:.3} day(s)", made_ng, days);
     let ngdaycell = made_ng / days / cells;
     // now, multiple by 10^6 to make rate by million cells 
     ngdaycell * 1_000_000.0
