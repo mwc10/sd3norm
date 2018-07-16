@@ -6,6 +6,7 @@ extern crate flexi_logger;
 extern crate serde;
 extern crate calamine;
 extern crate csv;
+extern crate walkdir;
 
 mod sd3;
 mod mifc;
@@ -16,6 +17,7 @@ use failure::{Error, ResultExt};
 use structopt::StructOpt;
 use calamine::{Reader, RangeDeserializerBuilder, open_workbook_auto};
 use flexi_logger::{Logger, default_format};
+use walkdir::WalkDir;
 use std::path::{Path, PathBuf};
 use std::fmt;
 use std::fs::{OpenOptions, self};
@@ -25,10 +27,11 @@ use sd3::SD3;
 #[derive(StructOpt, Debug)]
 /// Read an SD3 (MIFC + normalization info) excel workbook and create one normalized MIFC CSV for each sheet
 struct Opt {
-    /// Input sd3-formatted excel file
+    /// Any number of input sd3-formatted excel files or directories
     #[structopt(parse(from_os_str))]
-    input: PathBuf,
-    /// Append to INPUT file name when naming output file, defaults to "normalized"
+    input: Vec<PathBuf>,
+    /// Append to INPUT for output, defaults to "normalized"
+    #[structopt(short = "a", long = "append")]
     append: Option<String>,
     /// Print debug info based on the number of "v"s passed
     #[structopt(short = "v", parse(from_occurrences))]
@@ -65,45 +68,45 @@ fn main() {
 fn run(opts: Opt) -> Result<(), Error> {
     /* Convert collection of input files or directories into workbooks paths */
     let workbook = opts.input;
-    debug!("Workbooks: {:#?}", &workbook);
-
-    /* Get output base path by appending the value of optional directory flag */
-    let output_base = if let Some(mut dir) = opts.out_dir {
-        if !dir.exists() { 
-            fs::create_dir_all(&dir)?;
-        } else if !dir.is_dir() { 
-            bail!("Path <{:?}> passed to \"--out-dir\" is not a directory", &dir);
-        }
-
-        debug!("Output directory: {:?}", dir);
-
-        let input_filename = workbook.file_name()
-            .expect("the input workbook was not a file");
-
-        dir.push(input_filename);
-        dir.set_extension("csv");
-
-        dir
-    } else {
-        workbook.with_extension("csv")
-    };
-
+    let dir = opts.out_dir.as_ref().map(PathBuf::as_path);
     /* Get the value to append to the end of the output, or use the default */
     let append_str = opts.append.as_ref().map_or("normalized", String::as_ref);
-    debug!("output base: {:?}\nappend: {}", output_base, &append_str);
+    
+    /* Get output base path by appending the value of optional directory flag */
+    debug!("Workbooks Input: {:#?}", &workbook);
+    debug!("Output directory: {:?}", dir);
+    debug!("output append: {}", &append_str);
 
-    normalize_workbook(&workbook, &output_base, &append_str)?;
+    let wbs = workbook
+        .iter()
+        .flat_map(expand_dir)
+        .filter(is_excel)
+        .map(|wb| {
+            let out = generate_output_base(&wb, dir);
+            (wb, out, &append_str)
+        })
+        .collect::<Vec<_>>();
+
+    for (wb, out, app) in wbs.iter() {
+        match out {
+            Ok(out) => normalize_workbook(&wb, &out, &app)?,
+            Err(e) => {
+                warn!("Couldn't generate an output for workbook <{}> due to:\n{}", wb.display(), e);
+                continue;
+            }
+        }
+    }
 
     Ok(())
 }
 
-fn normalize_workbook<P>(wb_path: P, output_base: P, append: &str) -> Result<(), Error>
-where P: AsRef<Path> + fmt::Debug
+fn normalize_workbook<P, O>(wb_path: P, output_base: O, append: &str) -> Result<(), Error>
+where P: AsRef<Path> + fmt::Debug,
+      O: AsRef<Path> + fmt::Debug
 {
     let mut workbook = open_workbook_auto(&wb_path)
         .context(format!("opening excel workbook <{:?}>", &wb_path))?;
     /* Iterate over the sheets in a workbook */
-    // TODO: add sheet flag to CLI, and only process that sheet.
     let sheets = workbook.sheet_names().to_vec();
     let sheet_sum = sheets.len();
 
@@ -124,7 +127,7 @@ where P: AsRef<Path> + fmt::Debug
             append_file_name(&mut out, &appended_info);
             out
         };
-        
+
         info!("{:?} - {} (#{}):\nOutput file: {:?}", &wb_path, s, i, &output);
 
         let mut wtr = csv::Writer::from_writer(
@@ -190,6 +193,58 @@ fn append_file_name<S: AsRef<OsStr>>(path: &mut PathBuf, append: S) {
         path.set_file_name(appended);
     } else {
         path.set_file_name(append);
+    }
+}
+
+/// Read input path into a vec of PathBufs 
+fn expand_dir<P: AsRef<Path>>(entry: &P) -> Vec<PathBuf>
+{
+    WalkDir::new(entry.as_ref())
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path().to_path_buf())
+        .collect()
+}
+
+/// Check the extension of a Path to see if it is an excel workbook
+fn is_excel<P: AsRef<Path>>(file: &P) -> bool {    
+    if let Some(ex) = file.as_ref().extension() {
+        match &*ex.to_string_lossy() {
+            "xlsx" => true,
+            "xls" => true,
+            "xlsm" => true,
+            _ => false,
+        }
+    } else { false }
+}
+
+/// Turn the input path and the optional directory argument into an output path buffer
+fn generate_output_base(input: &Path, dir: Option<&Path>) -> Result<PathBuf, Error> {
+    if let Some(dir) = dir {
+        // Get parts of input Path to see if there is a directory structure 
+        // to attach to the output "base directory"
+        let input_filename = input.file_name()
+            .ok_or(format_err!("the input was not a file"))?;
+        let input_parent = input.parent();
+
+        // Generate output directory structure, if needed
+        let mut output = dir.to_path_buf();
+        if let Some(parent_path) = input_parent {
+            output.push(parent_path);
+        }
+
+        if !output.exists() { 
+            fs::create_dir_all(&output).context("making output subdirectory(ies)")?;
+        } else if !output.is_dir() { 
+            bail!("Path <{:?}> passed to \"--out-dir\" is not a directory", &output);
+        }
+
+        output.push(input_filename);
+        output.set_extension("csv");
+
+        Ok(output)
+    } else {
+        Ok(input.with_extension("csv"))
     }
 }
 

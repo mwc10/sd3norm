@@ -1,6 +1,7 @@
 # Input/Output files
 *.xlsx
 *.csv
+/testdir
 
 /target
 **/*.rs.bk
