@@ -79,7 +79,12 @@ fn run(opts: Opt) -> Result<(), Error> {
 
     let wbs = workbook
         .iter()
-        .flat_map(expand_dir)
+        .flat_map(|entry| { 
+            WalkDir::new(&entry)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path().to_path_buf())
+        })
         .filter(is_excel)
         .map(|wb| {
             let out = generate_output_base(&wb, dir);
@@ -196,7 +201,8 @@ fn append_file_name<S: AsRef<OsStr>>(path: &mut PathBuf, append: S) {
     }
 }
 
-/// Read input path into a vec of PathBufs 
+/// Read input path into a vec of PathBufs
+/*
 fn expand_dir<P: AsRef<Path>>(entry: &P) -> Vec<PathBuf>
 {
     WalkDir::new(entry.as_ref())
@@ -205,6 +211,7 @@ fn expand_dir<P: AsRef<Path>>(entry: &P) -> Vec<PathBuf>
         .map(|e| e.path().to_path_buf())
         .collect()
 }
+*/
 
 /// Check the extension of a Path to see if it is an excel workbook
 fn is_excel<P: AsRef<Path>>(file: &P) -> bool {    
