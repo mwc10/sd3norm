@@ -1,0 +1,4 @@
+*.rs	text=auto
+*.toml	text=auto
+*.lock	text=auto
+*.md	text=auto
