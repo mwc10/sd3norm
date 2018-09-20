@@ -90,7 +90,7 @@ impl SIUnit {
 
             g_day_cell => "g/day/cell",
             ng_day_cell => "ng/day/cell",
-            ng_day_millioncells => "g/day/10^6 cells",
+            ng_day_millioncells => "ng/day/10^6 cells",
         }
     }
     /// Factor to put this unit into base SI unit
@@ -154,7 +154,7 @@ impl FromStr for SIUnit {
 
             "g/day/cell" => Ok(g_day_cell),
             "ng/day/cell" => Ok(ng_day_cell),
-            "g/day/10^6 cells" | "g/day/10^6cells" => Ok(ng_day_millioncells),
+            "ng/day/10^6 cells" | "ng/day/10^6cells" => Ok(ng_day_millioncells),
             
             _ => Err(SIError::UnkType(s.to_string())),
         }

@@ -27,8 +27,8 @@ use sd3::SD3;
 #[derive(StructOpt, Debug)]
 /// Read an SD3 (MIFC + normalization info) excel workbook and create one normalized MIFC CSV for each sheet
 struct Opt {
-    /// Any number of input sd3-formatted excel files or directories
-    #[structopt(parse(from_os_str))]
+    /// Any number of input sd3-formatted excel files or directories containing excel files
+    #[structopt(name = "INPUT", parse(from_os_str))]
     input: Vec<PathBuf>,
     /// Append to INPUT for output, defaults to "normalized"
     #[structopt(short = "a", long = "append")]
@@ -36,7 +36,7 @@ struct Opt {
     /// Print debug info based on the number of "v"s passed
     #[structopt(short = "v", parse(from_occurrences))]
     verbose: usize,
-    /// Optional directory for output
+    /// Directory to create output file(s) in
     #[structopt(short = "d", long = "out-dir", parse(from_os_str))]
     out_dir: Option<PathBuf>, 
 }
@@ -66,18 +66,18 @@ fn main() {
 }
 
 fn run(opts: Opt) -> Result<(), Error> {
-    /* Convert collection of input files or directories into workbooks paths */
-    let workbook = opts.input;
-    let dir = opts.out_dir.as_ref().map(PathBuf::as_path);
+    let inputs = opts.input;    /* A possible mixed collection of directories and file paths */
+    let output_directory = opts.out_dir.as_ref().map(PathBuf::as_path);
     /* Get the value to append to the end of the output, or use the default */
     let append_str = opts.append.as_ref().map_or("normalized", String::as_ref);
     
     /* Get output base path by appending the value of optional directory flag */
-    debug!("Workbooks Input: {:#?}", &workbook);
-    debug!("Output directory: {:?}", dir);
+    debug!("Workbook(s) Input: {:#?}", &inputs);
+    debug!("Output directory: {:?}", output_directory);
     debug!("output append: {}", &append_str);
 
-    let wbs = workbook
+    /* Convert collection of input files and/or directories into a workbook path iterator */
+    let workbooks = inputs
         .iter()
         .flat_map(|entry| { 
             WalkDir::new(&entry)
@@ -87,12 +87,11 @@ fn run(opts: Opt) -> Result<(), Error> {
         })
         .filter(is_excel)
         .map(|wb| {
-            let out = generate_output_base(&wb, dir);
+            let out = generate_output_base(&wb, output_directory);
             (wb, out, &append_str)
-        })
-        .collect::<Vec<_>>();
-
-    for (wb, out, app) in wbs.iter() {
+        });
+    // TODO: Use a parallel iterator? 
+    for (wb, out, app) in workbooks {
         match out {
             Ok(out) => normalize_workbook(&wb, &out, &app)?,
             Err(e) => {

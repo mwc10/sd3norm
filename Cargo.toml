@@ -1,6 +1,6 @@
 [package]
 name = "sd3norm"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Mike C. <mwc10>"]
 
 [dependencies]
