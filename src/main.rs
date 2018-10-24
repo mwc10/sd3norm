@@ -86,6 +86,7 @@ fn run(opts: Opt) -> Result<(), Error> {
             .map(|e| e.path().to_path_buf())
         })
         .filter(is_excel)
+        .filter(is_not_excel_temp)
         .map(|wb| {
             let out = generate_output_base(&wb, output_directory);
             (wb, out, &append_str)
@@ -213,7 +214,7 @@ fn expand_dir<P: AsRef<Path>>(entry: &P) -> Vec<PathBuf>
 */
 
 /// Check the extension of a Path to see if it is an excel workbook
-fn is_excel<P: AsRef<Path>>(file: &P) -> bool {    
+fn is_excel<P: AsRef<Path>>(file: &P) -> bool {
     if let Some(ex) = file.as_ref().extension() {
         match &*ex.to_string_lossy() {
             "xlsx" => true,
@@ -222,6 +223,14 @@ fn is_excel<P: AsRef<Path>>(file: &P) -> bool {
             _ => false,
         }
     } else { false }
+}
+
+/// Check if an excel file is a not temp file
+fn is_not_excel_temp<P: AsRef<Path>>(file: &P) -> bool {
+    !file.as_ref()
+        .file_stem()
+        .filter(|s| s.to_string_lossy().starts_with("~"))
+        .is_some()
 }
 
 /// Turn the input path and the optional directory argument into an output path buffer
